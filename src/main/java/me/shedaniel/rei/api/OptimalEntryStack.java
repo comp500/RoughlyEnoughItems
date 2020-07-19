@@ -42,7 +42,7 @@ public interface OptimalEntryStack {
     default void optimisedRenderStart(MatrixStack matrices, float delta) {
     }
     
-    default void optimisedRenderBase(MatrixStack matrices, VertexConsumerProvider.Immediate immediate, Rectangle bounds, int mouseX, int mouseY, float delta) {
+    default void optimisedRenderBase(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Rectangle bounds, int mouseX, int mouseY, float delta) {
     }
     
     default void optimisedRenderOverlay(MatrixStack matrices, Rectangle bounds, int mouseX, int mouseY, float delta) {

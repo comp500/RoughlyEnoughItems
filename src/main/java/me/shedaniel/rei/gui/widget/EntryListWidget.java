@@ -175,8 +175,10 @@ public class EntryListWidget extends WidgetWithBounds {
             return 1;
         return MathHelper.ceil(allStacks.size() / (float) entries.size());
     }
+
+    private final EntryListWidgetVertexBufferManager vbm = new EntryListWidgetVertexBufferManager();
     
-    public static void renderEntries(boolean debugTime, int[] size, long[] time, boolean fastEntryRendering, MatrixStack matrices, int mouseX, int mouseY, float delta, List<EntryListEntryWidget> entries) {
+    public static void renderEntries(boolean debugTime, int[] size, long[] time, boolean fastEntryRendering, MatrixStack matrices, int mouseX, int mouseY, float delta, List<EntryListEntryWidget> entries, EntryListWidgetVertexBufferManager vbm) {
         if (entries.isEmpty()) return;
         EntryListEntryWidget firstWidget = entries.get(0);
         EntryStack first = firstWidget.getCurrentEntry();
@@ -184,15 +186,19 @@ public class EntryListWidget extends WidgetWithBounds {
             OptimalEntryStack firstStack = (OptimalEntryStack) first;
             firstStack.optimisedRenderStart(matrices, delta);
             long l = debugTime ? System.nanoTime() : 0;
-            VertexConsumerProvider.Immediate immediate = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
-            for (EntryListEntryWidget listEntry : entries) {
-                EntryStack currentEntry = listEntry.getCurrentEntry();
-                currentEntry.setZ(100);
-                listEntry.drawBackground(matrices, mouseX, mouseY, delta);
-                ((OptimalEntryStack) currentEntry).optimisedRenderBase(matrices, immediate, listEntry.getInnerBounds(), mouseX, mouseY, delta);
-                if (debugTime && !currentEntry.isEmpty()) size[0]++;
+            if (!vbm.isValid()) {
+                VertexConsumerProvider vcp = vbm.getRebuildingConsumer();
+                MatrixStack matricesNew = new MatrixStack();
+                for (EntryListEntryWidget listEntry : entries) {
+                    EntryStack currentEntry = listEntry.getCurrentEntry();
+                    currentEntry.setZ(100);
+                    listEntry.drawBackground(matricesNew, mouseX, mouseY, delta);
+                    ((OptimalEntryStack) currentEntry).optimisedRenderBase(matricesNew, vcp, listEntry.getInnerBounds(), mouseX, mouseY, delta);
+                    if (debugTime && !currentEntry.isEmpty()) size[0]++;
+                }
+                vbm.finishRebuild();
             }
-            immediate.draw();
+            vbm.render(matrices);
             for (EntryListEntryWidget listEntry : entries) {
                 EntryStack currentEntry = listEntry.getCurrentEntry();
                 ((OptimalEntryStack) currentEntry).optimisedRenderOverlay(matrices, listEntry.getInnerBounds(), mouseX, mouseY, delta);
@@ -250,10 +256,10 @@ public class EntryListWidget extends WidgetWithBounds {
             
             if (fastEntryRendering) {
                 entryStream.collect(Collectors.groupingBy(entryListEntry -> OptimalEntryStack.groupingHashFrom(entryListEntry.getCurrentEntry()))).forEach((integer, entries) -> {
-                    renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries);
+                    renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries, vbm);
                 });
             } else {
-                renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, entryStream.collect(Collectors.toList()));
+                renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, entryStream.collect(Collectors.toList()), vbm);
             }
             
             updatePosition(delta);
@@ -265,10 +271,10 @@ public class EntryListWidget extends WidgetWithBounds {
             }
             if (fastEntryRendering) {
                 entries.stream().collect(Collectors.groupingBy(entryListEntry -> OptimalEntryStack.groupingHashFrom(entryListEntry.getCurrentEntry()))).forEach((integer, entries) -> {
-                    renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries);
+                    renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries, vbm);
                 });
             } else {
-                renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries);
+                renderEntries(debugTime, size, time, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries, vbm);
             }
         }
         
@@ -368,6 +374,7 @@ public class EntryListWidget extends WidgetWithBounds {
     }
     
     public void updateEntriesPosition() {
+        vbm.invalidate();
         this.innerBounds = updateInnerBounds(bounds);
         if (!ConfigObject.getInstance().isEntryListWidgetScrolled()) {
             this.renders = Lists.newArrayList();
@@ -428,6 +435,7 @@ public class EntryListWidget extends WidgetWithBounds {
     }
     
     public void updateSearch(String searchTerm, boolean ignoreLastSearch) {
+        vbm.invalidate();
         long started = System.nanoTime();
         if (ignoreLastSearch || this.lastSearchTerm == null || !this.lastSearchTerm.equals(searchTerm)) {
             this.lastSearchTerm = searchTerm;

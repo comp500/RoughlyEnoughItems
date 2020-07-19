@@ -103,7 +103,9 @@ public class FavoritesListWidget extends WidgetWithBounds {
     public Rectangle getBounds() {
         return bounds;
     }
-    
+
+    private final EntryListWidgetVertexBufferManager vbm = new EntryListWidgetVertexBufferManager();
+
     @Override
     public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
         if (bounds.isEmpty())
@@ -134,10 +136,11 @@ public class FavoritesListWidget extends WidgetWithBounds {
         
         if (fastEntryRendering) {
             entryStream.collect(Collectors.groupingBy(entryListEntry -> OptimalEntryStack.groupingHashFrom(entryListEntry.getCurrentEntry()))).forEach((integer, entries) -> {
-                renderEntries(false, new int[]{0}, new long[]{0}, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries);
+                renderEntries(false, new int[]{0}, new long[]{0}, fastEntryRendering, matrices, mouseX, mouseY, delta, (List) entries, vbm);
             });
         } else {
-            renderEntries(false, new int[]{0}, new long[]{0}, fastEntryRendering, matrices, mouseX, mouseY, delta, entryStream.collect(Collectors.toList()));
+            // TODO: share VBM?
+            renderEntries(false, new int[]{0}, new long[]{0}, fastEntryRendering, matrices, mouseX, mouseY, delta, entryStream.collect(Collectors.toList()), vbm);
         }
         
         updatePosition(delta);
